@@ -3,6 +3,7 @@
 
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/image.hpp"
+#include "sensor_msgs/msg/compressed_image.hpp"
 
 #include <cv_bridge/cv_bridge.hpp>
 
@@ -21,15 +22,10 @@ public:
     ~MonocularSlamNode();
 
 private:
-    using ImageMsg = sensor_msgs::msg::Image;
-
-    void GrabImage(const sensor_msgs::msg::Image::SharedPtr msg);
 
     ORB_SLAM3::System* m_SLAM;
 
-    cv_bridge::CvImagePtr m_cvImPtr;
-
-    rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr m_image_subscriber;
+    rclcpp::SubscriptionBase::SharedPtr m_image_subscriber;
 };
 
 #endif

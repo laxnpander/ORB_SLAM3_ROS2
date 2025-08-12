@@ -2,17 +2,42 @@
 
 #include<opencv2/core/core.hpp>
 
-using std::placeholders::_1;
-
 MonocularSlamNode::MonocularSlamNode(ORB_SLAM3::System* pSLAM)
 :   Node("ORB_SLAM3_ROS2")
 {
+    declare_parameter("img_topic", "/camera/image_raw");
+    std::string topic_img = get_parameter("img_topic").as_string();
+    
+    declare_parameter("raw", true);
+    bool is_raw = get_parameter("raw").as_bool();
+    
     m_SLAM = pSLAM;
-    // std::cout << "slam changed" << std::endl;
-    m_image_subscriber = this->create_subscription<ImageMsg>(
-        "camera",
-        10,
-        std::bind(&MonocularSlamNode::GrabImage, this, std::placeholders::_1));
+    
+    if (is_raw)
+    {
+        m_image_subscriber = this->create_subscription<sensor_msgs::msg::Image>(
+            topic_img,
+            10,
+            [this](const sensor_msgs::msg::Image::UniquePtr &msg)
+            {
+                double time = Utility::StampToSec(msg->header.stamp);
+                cv::Mat img = Utility::toCvMat(msg);
+                m_SLAM->TrackMonocular(img, time);
+            });
+    }
+    else
+    {
+        m_image_subscriber = this->create_subscription<sensor_msgs::msg::CompressedImage>(
+            topic_img,
+            10,
+            [this](const sensor_msgs::msg::CompressedImage::UniquePtr &msg)
+            {
+                double time = Utility::StampToSec(msg->header.stamp);
+                cv::Mat img = Utility::toCvMat(msg);
+                m_SLAM->TrackMonocular(img, time);
+            });
+    }
+    
     std::cout << "slam changed" << std::endl;
 }
 
@@ -23,21 +48,4 @@ MonocularSlamNode::~MonocularSlamNode()
 
     // Save camera trajectory
     m_SLAM->SaveKeyFrameTrajectoryTUM("KeyFrameTrajectory.txt");
-}
-
-void MonocularSlamNode::GrabImage(const ImageMsg::SharedPtr msg)
-{
-    // Copy the ros image message to cv::Mat.
-    try
-    {
-        m_cvImPtr = cv_bridge::toCvCopy(msg);
-    }
-    catch (cv_bridge::Exception& e)
-    {
-        RCLCPP_ERROR(this->get_logger(), "cv_bridge exception: %s", e.what());
-        return;
-    }
-
-    std::cout<<"one frame has been sent"<<std::endl;
-    m_SLAM->TrackMonocular(m_cvImPtr->image, Utility::StampToSec(msg->header.stamp));
 }
